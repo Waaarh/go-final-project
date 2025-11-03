@@ -54,7 +54,7 @@ func addTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if task.Title == "" || task.Comment == "" || task.Repeat == "" {
+	if task.Title == "" {
 		writeJSON(w, map[string]string{"error": "title is required"}, http.StatusBadRequest)
 		return
 	}
@@ -70,5 +70,5 @@ func addTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{"id": id}, http.StatusOK)
-
+	return
 }
