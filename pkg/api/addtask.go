@@ -35,34 +35,40 @@ func checkDate(task *db.Task) error {
 	return nil
 }
 
+func writeJSON(w http.ResponseWriter, data any, code int) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(data)
+}
+
 func addTaskHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		writeJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
 		return
 	}
 
 	var task db.Task
+
 	if err := json.NewDecoder(r.Body).Decode(&task); err != nil {
-		http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
+		writeJSON(w, map[string]string{"error": "invalid json"}, http.StatusBadRequest)
 		return
 	}
 
-	if task.Title == "" {
-		http.Error(w, `{"error":"title is required"}`, http.StatusBadRequest)
+	if task.Title == "" || task.Comment == "" || task.Repeat == "" {
+		writeJSON(w, map[string]string{"error": "title is required"}, http.StatusBadRequest)
 		return
 	}
 
 	if err := checkDate(&task); err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+		writeJSON(w, map[string]string{"error": err.Error()}, http.StatusBadRequest)
 		return
 	}
 
 	id, err := db.AddTask(&task)
 	if err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+		writeJSON(w, map[string]string{"error": err.Error()}, http.StatusInternalServerError)
 		return
 	}
+	writeJSON(w, map[string]any{"id": id}, http.StatusOK)
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"id": id})
 }

@@ -9,7 +9,7 @@ import (
 )
 
 func afterNow(now, t time.Time) bool {
-	return t.After(now)
+	return now.After(t)
 }
 
 func NextDayHandler(w http.ResponseWriter, r *http.Request) {
