@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+func afterNow(now, t time.Time) bool {
+	return t.After(now)
+}
+
 func NextDayHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("Debug: now=%q, date=%q, repeat=%q\n",
 		r.URL.Query().Get("now"),
