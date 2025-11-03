@@ -9,7 +9,10 @@ import (
 )
 
 func afterNow(now, t time.Time) bool {
-	return now.After(t)
+	// Сравниваем только даты без времени суток чтобы задача,
+	// назначенная на сегодняшнюю дату, не считалась «в прошлом» из-за часов
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	return today.After(t)
 }
 
 func NextDayHandler(w http.ResponseWriter, r *http.Request) {
