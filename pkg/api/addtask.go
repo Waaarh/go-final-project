@@ -12,8 +12,6 @@ import (
 func checkDate(task *db.Task) error {
 	now := time.Now()
 
-	// Если клиент отправил пустую дату или строку "today",
-	// приводим её к формату YYYYMMDD, так фронтенд может посылать "today"
 	if strings.TrimSpace(task.Date) == "" || strings.TrimSpace(task.Date) == "today" {
 		task.Date = now.Format("20060102")
 	}
@@ -45,8 +43,6 @@ func writeJSON(w http.ResponseWriter, data any, code int) {
 }
 
 func addTaskHandler(w http.ResponseWriter, r *http.Request) {
-	// Защита от паники: если что-то пойдет не так, вернём корректный JSON с ошибкой,
-	// чтобы фронтенд и тесты не получили пустой ну или невалидный ответ
 	defer func() {
 		if rec := recover(); rec != nil {
 			writeJSON(w, map[string]string{"error": "internal server error"}, http.StatusInternalServerError)

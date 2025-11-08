@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
 	"strconv"
 )
 
@@ -14,9 +15,6 @@ type Task struct {
 }
 
 func AddTask(task *Task) (int64, error) {
-	// Если глобальная переменная DB ещё не инициализирована (сервер
-	// запускают не через main или вызов Init пропущен), то инициализируем БД
-	// здесь, чтобы избежать nil-pointer panic при вставке
 	if DB() == nil {
 		if err := Init(DBFile); err != nil {
 			return 0, err
@@ -65,4 +63,57 @@ func ListTasks(search string) ([]Task, error) {
 		out = append(out, Task{ID: strconv.FormatInt(id, 10), Date: date, Title: title, Comment: comment, Repeat: repeat})
 	}
 	return out, nil
+}
+func GetTask(idStr string) (*Task, error) {
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid task ID: '%s'", idStr)
+	}
+	query := `SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?`
+
+	var (
+		ID      int64
+		date    string
+		title   string
+		comment string
+		repeat  string
+	)
+
+	err = DB().QueryRow(query, id).Scan(&ID, &date, &title, &comment, &repeat)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("task with ID %s not found", idStr)
+		}
+		return nil, fmt.Errorf("database error: %w", err)
+	}
+	task := Task{
+		ID:      strconv.FormatInt(ID, 10),
+		Date:    date,
+		Title:   title,
+		Comment: comment,
+		Repeat:  repeat,
+	}
+
+	return &task, nil
+}
+func UpdateTask(idStr string, task *Task) error {
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid task ID: '%s'", idStr)
+	}
+
+	query := `UPDATE scheduler SET date=?, title=?, comment=?, repeat=? WHERE id=?`
+	res, err := DB().Exec(query, task.Date, task.Title, task.Comment, task.Repeat, id) // ← id — int64
+	if err != nil {
+		return err
+	}
+
+	count, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return fmt.Errorf("task with ID %s not found", idStr)
+	}
+	return nil
 }
