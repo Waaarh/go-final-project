@@ -5,13 +5,14 @@ import (
 	"go1f/pkg/dateutils"
 	"go1f/pkg/db"
 	"net/http"
+	"strings"
 	"time"
 )
 
 func checkDate(task *db.Task) error {
 	now := time.Now()
 
-	if task.Date == "" {
+	if strings.TrimSpace(task.Date) == "" || strings.TrimSpace(task.Date) == "today" {
 		task.Date = now.Format("20060102")
 	}
 
@@ -42,6 +43,11 @@ func writeJSON(w http.ResponseWriter, data any, code int) {
 }
 
 func addTaskHandler(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		if rec := recover(); rec != nil {
+			writeJSON(w, map[string]string{"error": "internal server error"}, http.StatusInternalServerError)
+		}
+	}()
 	if r.Method != http.MethodPost {
 		writeJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
 		return
