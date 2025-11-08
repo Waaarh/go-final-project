@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"go1f/pkg/dateutils"
 	"go1f/pkg/db"
 	"net/http"
 	"strings"
@@ -12,6 +13,7 @@ func Init() {
 	http.HandleFunc("/api/nextdate", NextDayHandler)
 	http.HandleFunc("/api/task", taskHandler)
 	http.HandleFunc("/api/tasks", tasksHandler)
+	http.HandleFunc("/api/task/done", taskDone)
 }
 
 func taskHandler(w http.ResponseWriter, r *http.Request) {
@@ -22,7 +24,76 @@ func taskHandler(w http.ResponseWriter, r *http.Request) {
 		taskGet(w, r)
 	case http.MethodPut:
 		taskPut(w, r)
+	case http.MethodDelete:
+		taskDelete(w, r)
 	}
+}
+func taskDone(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		writeJSON(w, map[string]string{"error": "id is required"}, http.StatusBadRequest)
+		return
+	}
+
+	task, err := db.GetTask(id)
+	if err != nil {
+		writeJSON(w, map[string]string{"error": "Задача не найдена"}, http.StatusNotFound)
+		return
+	}
+
+	if task.Repeat == "" {
+		err := db.DeleteTask(id)
+		if err != nil {
+			writeJSON(w, map[string]string{"error": err.Error()}, http.StatusInternalServerError)
+			return
+		}
+	} else {
+
+		now := time.Now()
+		nextDate, err := dateutils.NextDate(now, task.Date, task.Repeat)
+		if err != nil {
+			writeJSON(w, map[string]string{"error": err.Error()}, http.StatusInternalServerError)
+			return
+		}
+
+		err = db.UpdateDate(id, nextDate)
+		if err != nil {
+			writeJSON(w, map[string]string{"error": err.Error()}, http.StatusInternalServerError)
+			return
+		}
+	}
+
+	writeJSON(w, map[string]interface{}{}, http.StatusOK)
+}
+
+func taskDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		writeJSON(w, map[string]string{"error": "id is required"}, http.StatusBadRequest)
+		return
+	}
+
+	err := db.DeleteTask(id)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			writeJSON(w, map[string]string{"error": "Задача не найдена"}, http.StatusNotFound)
+		} else {
+			writeJSON(w, map[string]string{"error": err.Error()}, http.StatusInternalServerError)
+		}
+		return
+	}
+
+	writeJSON(w, map[string]interface{}{}, http.StatusOK)
 }
 
 func tasksHandler(w http.ResponseWriter, r *http.Request) {
@@ -86,7 +157,6 @@ func taskPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Базовые проверки как в тесте
 	if input.Title == "" {
 		writeJSON(w, map[string]string{"error": "title is required"}, http.StatusBadRequest)
 		return
@@ -97,7 +167,6 @@ func taskPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Проверка формата даты
 	if len(input.Date) != 8 {
 		writeJSON(w, map[string]string{"error": "invalid date format"}, http.StatusBadRequest)
 		return
@@ -109,10 +178,7 @@ func taskPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Простая проверка repeat - только что не пустая строка если указана
-	// Для "ooops" это провалится
 	if input.Repeat != "" {
-		// Проверяем только что это один из известных префиксов или "y"
 		if input.Repeat != "y" &&
 			!strings.HasPrefix(input.Repeat, "d ") &&
 			!strings.HasPrefix(input.Repeat, "w ") &&
