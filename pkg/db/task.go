@@ -117,3 +117,56 @@ func UpdateTask(idStr string, task *Task) error {
 	}
 	return nil
 }
+
+func DeleteTask(idStr string) error {
+	if DB() == nil {
+		if err := Init(DBFile); err != nil {
+			return err
+		}
+	}
+
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid task ID: '%s'", idStr)
+	}
+
+	query := `DELETE FROM scheduler WHERE id=?`
+	res, err := DB().Exec(query, id)
+	if err != nil {
+		return err
+	}
+
+	count, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return fmt.Errorf("task with ID %s not found", idStr)
+	}
+	return nil
+}
+
+func UpdateDate(idStr string, newDate string) error {
+	if DB() == nil {
+		if err := Init(DBFile); err != nil {
+			return err
+		}
+	}
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid task ID: '%s'", idStr)
+	}
+	query := `UPDATE scheduler SET date=? WHERE id=?`
+	res, err := DB().Exec(query, newDate, id)
+	if err != nil {
+		return err
+	}
+	count, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return fmt.Errorf("task with ID %s not found", idStr)
+	}
+	return nil
+}
