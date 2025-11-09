@@ -5,15 +5,17 @@ import (
 	"go1f/pkg/dateutils"
 	"go1f/pkg/db"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
 
 func Init() {
 	http.HandleFunc("/api/nextdate", NextDayHandler)
-	http.HandleFunc("/api/task", taskHandler)
-	http.HandleFunc("/api/tasks", tasksHandler)
-	http.HandleFunc("/api/task/done", taskDone)
+	http.HandleFunc("/api/task", auth(taskHandler))
+	http.HandleFunc("/api/tasks", auth(tasksHandler))
+	http.HandleFunc("/api/task/done", auth(taskDone))
+	http.HandleFunc("/api/signin", signInHandler)
 }
 
 func taskHandler(w http.ResponseWriter, r *http.Request) {
@@ -28,6 +30,45 @@ func taskHandler(w http.ResponseWriter, r *http.Request) {
 		taskDelete(w, r)
 	}
 }
+
+func auth(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		pass := os.Getenv("TODO_PASSWORD")
+		if pass == "" {
+			next(w, r)
+			return
+		}
+
+		cookie, _ := r.Cookie("token")
+		if cookie == nil || cookie.Value != pass {
+			http.Error(w, "Auth required", http.StatusUnauthorized)
+			return
+		}
+
+		next(w, r)
+	})
+}
+
+func signInHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var input struct {
+		Password string `json:"password"`
+	}
+	json.NewDecoder(r.Body).Decode(&input)
+
+	envPass := os.Getenv("TODO_PASSWORD")
+	if input.Password != envPass {
+		writeJSON(w, map[string]string{"error": "Неверный пароль"}, http.StatusUnauthorized)
+		return
+	}
+
+	writeJSON(w, map[string]string{"token": envPass}, http.StatusOK)
+}
+
 func taskDone(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSON(w, map[string]string{"error": "method not allowed"}, http.StatusMethodNotAllowed)
